@@ -14,6 +14,7 @@
 // PROVIDED functions: commit_parse, commit_serialize, commit_walk, head_read, head_update
 // TODO functions:     commit_create
 // Linked commit with tree structure
+// Added parent commit reference handling
 #include "commit.h"
 #include "index.h"
 #include "tree.h"
