@@ -21,6 +21,7 @@
 // phase 1 progress
 // Added directory sharding logic to store objects efficiently
 // Implemented object_read to retrieve stored objects
+// Completed testing for blob storage, deduplication and integrity checks
 void hash_to_hex(const ObjectID *id, char *hex_out) {
     for (int i = 0; i < HASH_SIZE; i++) {
         sprintf(hex_out + i * 2, "%02x", id->hash[i]);
