@@ -18,6 +18,7 @@
 // Implemented index_save with sorting and safe file write using temp file
 // Implemented index_add to add files into staging area
 // Integrated object_write to store blobs and update index entries
+// Fixed segmentation fault by moving large struct to heap and ensuring safe memory handling
 #include "index.h"
 #include <stdio.h>
 #include <stdlib.h>
