@@ -10,6 +10,7 @@
 //   "100644 hello.txt\0" followed by 32 raw bytes of SHA-256
 
 #include "tree.h"
+#include "index.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -129,9 +130,68 @@ int tree_serialize(const Tree *tree, void **data_out, size_t *len_out) {
 //   - object_write    : save that binary buffer to the store as OBJ_TREE
 //
 // Returns 0 on success, -1 on error.
+static int build_tree(IndexEntry *entries, int count, int depth, ObjectID *id_out) {
+    Tree t;
+    t.count = 0;
+    
+    int i = 0;
+    while (i < count) {
+        const char *path = entries[i].path;
+        int parts_len = 0;
+        const char *p = path;
+        for (int d = 0; d < depth; d++) {
+            p = strchr(p, '/');
+            if (p) { p++; parts_len = p - path; } else break;
+        }
+        
+        const char *name = path + parts_len;
+        const char *slash = strchr(name, '/');
+        
+        TreeEntry *te = &t.entries[t.count++];
+        
+        if (!slash) {
+            snprintf(te->name, sizeof(te->name), "%s", name);
+            te->mode = entries[i].mode;
+            te->hash = entries[i].hash;
+            i++;
+        } else {
+            int name_len = slash - name;
+            snprintf(te->name, sizeof(te->name), "%.*s", name_len, name);
+            te->mode = 0040000;
+            
+            int j = i;
+            char prefix[512];
+            snprintf(prefix, sizeof(prefix), "%.*s/", (int)(slash - path) + 1, path);
+            int prefix_len = strlen(prefix);
+            
+            while (j < count && strncmp(entries[j].path, prefix, prefix_len) == 0) j++;
+            
+            if (build_tree(entries + i, j - i, depth + 1, &te->hash) != 0) return -1;
+            i = j;
+        }
+    }
+    
+    void *data;
+    size_t len;
+    if (tree_serialize(&t, &data, &len) != 0) return -1;
+    
+    int r = object_write(OBJ_TREE, data, len, id_out);
+    free(data);
+    return r;
+}
+
 int tree_from_index(ObjectID *id_out) {
-    // TODO: Implement recursive tree building
-    // (See Lab Appendix for logical steps)
-    (void)id_out;
-    return -1;
+    Index idx;
+    if (index_load(&idx) != 0) return -1;
+    
+    if (idx.count == 0) {
+        Tree t; t.count = 0;
+        void *d; size_t l;
+        tree_serialize(&t, &d, &l);
+        int r = object_write(OBJ_TREE, d, l, id_out);
+        free(d);
+        return r;
+    }
+    
+    return build_tree(idx.entries, idx.count, 0, id_out);
 }
