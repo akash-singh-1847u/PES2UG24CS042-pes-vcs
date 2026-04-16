@@ -94,35 +94,95 @@ int object_exists(const ObjectID *id) {
 //
 // Returns 0 on success, -1 on error.
 int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out) {
-    // TODO: Implement
-    (void)type; (void)data; (void)len; (void)id_out;
-    return -1;
+    const char *t_str = (type == OBJ_BLOB) ? "blob" : (type == OBJ_TREE ? "tree" : "commit");
+    char header[64];
+    int hlen = snprintf(header, sizeof(header), "%s %zu", t_str, len);
+    
+    size_t full_len = hlen + 1 + len;
+    uint8_t *buf = malloc(full_len);
+    if (!buf) return -1;
+    
+    memcpy(buf, header, hlen + 1);
+    memcpy(buf + hlen + 1, data, len);
+    
+    compute_hash(buf, full_len, id_out);
+    
+    if (object_exists(id_out)) {
+        free(buf);
+        return 0;
+    }
+    
+    char path[512];
+    object_path(id_out, path, sizeof(path));
+    
+    char dir[512];
+    snprintf(dir, sizeof(dir), "%s", path);
+    char *slash = strrchr(dir, '/');
+    if (slash) *slash = '\0';
+    
+    mkdir(dir, 0755);
+    
+    char tmp[512];
+    snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+    
+    int fd = open(tmp, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fd < 0) { free(buf); return -1; }
+    
+    if (write(fd, buf, full_len) != (ssize_t)full_len) {
+        close(fd); free(buf); return -1;
+    }
+    
+    fsync(fd);
+    close(fd);
+    
+    if (rename(tmp, path) != 0) { free(buf); return -1; }
+    
+    int dir_fd = open(dir, O_RDONLY);
+    if (dir_fd >= 0) { fsync(dir_fd); close(dir_fd); }
+    
+    free(buf);
+    return 0;
 }
 
-// Read an object from the store.
-//
-// Steps:
-//   1. Build the file path from the hash using object_path()
-//   2. Open and read the entire file
-//   3. Parse the header to extract the type string and size
-//   4. Verify integrity: recompute the SHA-256 of the file contents
-//      and compare to the expected hash (from *id). Return -1 if mismatch.
-//   5. Set *type_out to the parsed ObjectType
-//   6. Allocate a buffer, copy the data portion (after the \0), set *data_out and *len_out
-//
-// HINTS - Useful syscalls and functions for this phase:
-//   - object_path        : getting the target file path
-//   - fopen, fread, fseek: reading the file into memory
-//   - memchr             : safely finding the '\0' separating header and data
-//   - strncmp            : parsing the type string ("blob", "tree", "commit")
-//   - compute_hash       : re-hashing the read data for integrity verification
-//   - memcmp             : comparing the computed hash against the requested hash
-//   - malloc, memcpy     : allocating and returning the extracted data
-//
-// The caller is responsible for calling free(*data_out).
-// Returns 0 on success, -1 on error (file not found, corrupt, etc.).
 int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_t *len_out) {
-    // TODO: Implement
-    (void)id; (void)type_out; (void)data_out; (void)len_out;
-    return -1;
+    char path[512];
+    object_path(id, path, sizeof(path));
+    
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+    
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    rewind(f);
+    
+    uint8_t *buf = malloc(size);
+    if (!buf) { fclose(f); return -1; }
+    
+    if (fread(buf, 1, size, f) != (size_t)size) { free(buf); fclose(f); return -1; }
+    fclose(f);
+    
+    ObjectID comp;
+    compute_hash(buf, size, &comp);
+    if (memcmp(id->hash, comp.hash, HASH_SIZE) != 0) { free(buf); return -1; }
+    
+    uint8_t *null_b = memchr(buf, '\0', size);
+    if (!null_b) { free(buf); return -1; }
+    
+    char t_str[32];
+    size_t dlen;
+    if (sscanf((char *)buf, "%31s %zu", t_str, &dlen) != 2) { free(buf); return -1; }
+    
+    if (strcmp(t_str, "blob") == 0) *type_out = OBJ_BLOB;
+    else if (strcmp(t_str, "tree") == 0) *type_out = OBJ_TREE;
+    else if (strcmp(t_str, "commit") == 0) *type_out = OBJ_COMMIT;
+    else { free(buf); return -1; }
+    
+    *data_out = malloc(dlen);
+    if (!*data_out) { free(buf); return -1; }
+    
+    *len_out = dlen;
+    memcpy(*data_out, null_b + 1, dlen);
+    free(buf);
+    
+    return 0;
 }
