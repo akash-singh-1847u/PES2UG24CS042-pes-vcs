@@ -17,6 +17,7 @@
 // Implemented index_load to read entries from .pes/index
 // Implemented index_save with sorting and safe file write using temp file
 // Implemented index_add to add files into staging area
+// Integrated object_write to store blobs and update index entries
 #include "index.h"
 #include <stdio.h>
 #include <stdlib.h>
