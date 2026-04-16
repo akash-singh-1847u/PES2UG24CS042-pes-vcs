@@ -16,6 +16,7 @@
 // Linked commit with tree structure
 // Added parent commit reference handling
 // Added metadata such as author and timestamp
+// Implemented commit log traversal
 #include "commit.h"
 #include "index.h"
 #include "tree.h"
