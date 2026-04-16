@@ -15,6 +15,7 @@
 // PROVIDED functions: index_find, index_remove, index_status
 // TODO functions:     index_load, index_save, index_add
 // Implemented index_load to read entries from .pes/index
+// Implemented index_save with sorting and safe file write using temp file
 #include "index.h"
 #include <stdio.h>
 #include <stdlib.h>
