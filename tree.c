@@ -9,6 +9,7 @@
 // Example single entry (conceptual):
 //   "100644 hello.txt\0" followed by 32 raw bytes of SHA-256
 // Initialized tree structure for storing directory entries
+// Implemented serialization of tree entries into buffer
 #include "tree.h"
 #include "index.h"
 #include <stdio.h>
