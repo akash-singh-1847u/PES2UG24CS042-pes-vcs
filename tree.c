@@ -11,6 +11,7 @@
 // Initialized tree structure for storing directory entries
 // Implemented serialization of tree entries into buffer
 // Implemented parsing logic to reconstruct tree from stored data
+// Built tree structure using index entries
 #include "tree.h"
 #include "index.h"
 #include <stdio.h>
